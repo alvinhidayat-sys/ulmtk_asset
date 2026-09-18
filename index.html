@@ -669,6 +669,27 @@
       return [...new Set(arr.map(r=>r[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     }
 
+    // Perbandingan site dibuat toleran terhadap beda spasi/kapitalisasi
+    // antara sheet Tenaga Kerja & Kendaraan (mis. "Kotamobagu " vs "KOTAMOBAGU").
+    function normKey(s){
+      return String(s ?? '').trim().toUpperCase().replace(/\s+/g,' ');
+    }
+
+    // Gabungan nilai unik "site" dari beberapa dataset (TK + KD), dengan
+    // deduplikasi berbasis normKey tapi tetap menampilkan label asli.
+    function uniqueSortedSiteCombined(...arrays){
+      const map = new Map(); // normKey -> label asli (tampilan)
+      arrays.forEach(arr=>{
+        arr.forEach(r=>{
+          const raw = r.site;
+          if(!raw) return;
+          const nk = normKey(raw);
+          if(!map.has(nk)) map.set(nk, String(raw).trim());
+        });
+      });
+      return [...map.values()].sort((a,b)=>a.localeCompare(b));
+    }
+
     function fillSelect(sel, values, allLabel, currentValue){
       sel.innerHTML = '<option value="ALL">'+allLabel+'</option>' +
         values.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
@@ -678,11 +699,11 @@
     function filterTK(){
       return TK.filter(r =>
         (state.bidang==='ALL' || r.bidang===state.bidang) &&
-        (state.site==='ALL' || r.site===state.site)
+        (state.site==='ALL' || normKey(r.site)===normKey(state.site))
       );
     }
     function filterKD(){
-      return KD.filter(r => (state.site==='ALL' || r.site===state.site));
+      return KD.filter(r => (state.site==='ALL' || normKey(r.site)===normKey(state.site)));
     }
 
     function groupCount(rows, key){
@@ -835,7 +856,7 @@
 
     function rebind(){
       fillSelect(document.getElementById('f-bidang'), uniqueSorted(TK,'bidang'), 'Semua Bidang', state.bidang);
-      fillSelect(document.getElementById('f-site'), uniqueSorted(TK,'site'), 'Semua Site', state.site);
+      fillSelect(document.getElementById('f-site'), uniqueSortedSiteCombined(TK, KD), 'Semua Site', state.site);
       state.bidang = document.getElementById('f-bidang').value;
       state.site = document.getElementById('f-site').value;
       refresh();
