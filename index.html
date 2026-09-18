@@ -367,7 +367,7 @@
         <span class="dot kd"></span>
         <div>
           <h2>Rekapitulasi Aset Kendaraan</h2>
-          <div class="panel-desc">Filter Bidang tidak memengaruhi data ini (tidak ada kolom bidang pada data kendaraan) — hanya Site</div>
+          <div class="panel-desc">Filter Bidang &amp; Site berlaku penuh pada data ini</div>
         </div>
       </div>
       <div class="panel-controls">
@@ -376,6 +376,7 @@
           <select id="kd-groupby">
             <option value="jenis">Jenis Kendaraan</option>
             <option value="fungsi">Fungsi Kendaraan</option>
+            <option value="bidang">Bidang</option>
             <option value="ulp">Nama ULP</option>
             <option value="lokasi">Lokasi</option>
             <option value="merk">Merk / Type</option>
@@ -480,6 +481,7 @@
   };
   const KD_FIELD_MAP = {
     'no':'no',
+    'bidang':'bidang',
     'site':'site',
     'jenis kendaraan':'jenis', 'jenis':'jenis',
     'fungsi kendaraan':'fungsi', 'fungsi':'fungsi',
@@ -675,13 +677,13 @@
       return String(s ?? '').trim().toUpperCase().replace(/\s+/g,' ');
     }
 
-    // Gabungan nilai unik "site" dari beberapa dataset (TK + KD), dengan
-    // deduplikasi berbasis normKey tapi tetap menampilkan label asli.
-    function uniqueSortedSiteCombined(...arrays){
+    // Gabungan nilai unik suatu field dari beberapa dataset (mis. TK + KD),
+    // dengan deduplikasi berbasis normKey tapi tetap menampilkan label asli.
+    function uniqueSortedCombined(key, ...arrays){
       const map = new Map(); // normKey -> label asli (tampilan)
       arrays.forEach(arr=>{
         arr.forEach(r=>{
-          const raw = r.site;
+          const raw = r[key];
           if(!raw) return;
           const nk = normKey(raw);
           if(!map.has(nk)) map.set(nk, String(raw).trim());
@@ -698,12 +700,15 @@
 
     function filterTK(){
       return TK.filter(r =>
-        (state.bidang==='ALL' || r.bidang===state.bidang) &&
+        (state.bidang==='ALL' || normKey(r.bidang)===normKey(state.bidang)) &&
         (state.site==='ALL' || normKey(r.site)===normKey(state.site))
       );
     }
     function filterKD(){
-      return KD.filter(r => (state.site==='ALL' || normKey(r.site)===normKey(state.site)));
+      return KD.filter(r =>
+        (state.bidang==='ALL' || normKey(r.bidang)===normKey(state.bidang)) &&
+        (state.site==='ALL' || normKey(r.site)===normKey(state.site))
+      );
     }
 
     function groupCount(rows, key){
@@ -742,7 +747,7 @@
       return {jabatan:'Jabatan', unit:'Unit/Penempatan', site:'Site', kontrak:'Project', bidang:'Bidang', tim:'Tim'}[key] || key;
     }
     function labelForKD(key){
-      return {jenis:'Jenis Kendaraan', fungsi:'Fungsi', ulp:'Nama ULP', lokasi:'Lokasi', merk:'Merk/Type', warna:'Warna'}[key] || key;
+      return {jenis:'Jenis Kendaraan', fungsi:'Fungsi', bidang:'Bidang', ulp:'Nama ULP', lokasi:'Lokasi', merk:'Merk/Type', warna:'Warna'}[key] || key;
     }
 
     /* ---------- Drawer ---------- */
@@ -765,7 +770,7 @@
       {key:'tim', label:'Tim'}, {key:'bidang', label:'Bidang'}, {key:'kontrak', label:'Project (Kontrak)'}
     ];
     const KD_COLUMNS = [
-      {key:'no', label:'NO'}, {key:'site', label:'SITE'}, {key:'jenis', label:'JENIS KENDARAAN'},
+      {key:'no', label:'NO'}, {key:'bidang', label:'BIDANG'}, {key:'site', label:'SITE'}, {key:'jenis', label:'JENIS KENDARAAN'},
       {key:'fungsi', label:'FUNGSI KENDARAAN'}, {key:'regu', label:'REGU'}, {key:'merk', label:'MERK/TYPE'},
       {key:'tahun', label:'TAHUN'}, {key:'rangka', label:'NOMOR RANGKA'}, {key:'mesin', label:'NOMOR MESIN'},
       {key:'warna', label:'WARNA'}, {key:'polisi', label:'NOMOR POLISI'}, {key:'pemilik', label:'NAMA PEMILIK'},
@@ -855,8 +860,8 @@
     }
 
     function rebind(){
-      fillSelect(document.getElementById('f-bidang'), uniqueSorted(TK,'bidang'), 'Semua Bidang', state.bidang);
-      fillSelect(document.getElementById('f-site'), uniqueSortedSiteCombined(TK, KD), 'Semua Site', state.site);
+      fillSelect(document.getElementById('f-bidang'), uniqueSortedCombined('bidang', TK, KD), 'Semua Bidang', state.bidang);
+      fillSelect(document.getElementById('f-site'), uniqueSortedCombined('site', TK, KD), 'Semua Site', state.site);
       state.bidang = document.getElementById('f-bidang').value;
       state.site = document.getElementById('f-site').value;
       refresh();
