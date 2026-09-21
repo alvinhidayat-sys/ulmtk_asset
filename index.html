@@ -811,7 +811,29 @@
     function fillSelect(sel, values, allLabel, currentValue){
       sel.innerHTML = '<option value="ALL">'+allLabel+'</option>' +
         values.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
-      sel.value = values.includes(currentValue) ? currentValue : 'ALL';
+      // Pertahankan pilihan lama bila masih ada di daftar (dibandingkan via normKey),
+      // kalau tidak ada otomatis kembali ke "Semua".
+      const keep = currentValue==='ALL' ? undefined : values.find(v=>normKey(v)===normKey(currentValue));
+      sel.value = keep !== undefined ? keep : 'ALL';
+    }
+
+    // Filter bertingkat: daftar Site hanya berisi site yang ada pada Bidang terpilih
+    // (diambil dari gabungan data Tenaga Kerja + Kendaraan).
+    function sitesForBidang(bidang){
+      if(bidang==='ALL') return uniqueSortedCombined('site', TK, KD);
+      const nb = normKey(bidang);
+      const sameBidang = r => normKey(r.bidang)===nb;
+      return uniqueSortedCombined('site', TK.filter(sameBidang), KD.filter(sameBidang));
+    }
+
+    // Isi ulang dropdown Bidang lalu Site (berurutan / bertingkat).
+    function syncFilterOptions(){
+      const selBidang = document.getElementById('f-bidang');
+      const selSite = document.getElementById('f-site');
+      fillSelect(selBidang, uniqueSortedCombined('bidang', TK, KD), 'Semua Bidang', state.bidang);
+      state.bidang = selBidang.value;
+      fillSelect(selSite, sitesForBidang(state.bidang), 'Semua Site', state.site);
+      state.site = selSite.value; // otomatis 'ALL' jika site lama tidak ada di bidang baru
     }
 
     function filterTK(){
@@ -976,21 +998,22 @@
     }
 
     function rebind(){
-      fillSelect(document.getElementById('f-bidang'), uniqueSortedCombined('bidang', TK, KD), 'Semua Bidang', state.bidang);
-      fillSelect(document.getElementById('f-site'), uniqueSortedCombined('site', TK, KD), 'Semua Site', state.site);
-      state.bidang = document.getElementById('f-bidang').value;
-      state.site = document.getElementById('f-site').value;
+      syncFilterOptions();
       refresh();
     }
 
-    document.getElementById('f-bidang').addEventListener('change', e=>{ state.bidang = e.target.value; refresh(); });
+    // Ganti Bidang -> daftar Site dibangun ulang sesuai bidang tsb.
+    document.getElementById('f-bidang').addEventListener('change', e=>{
+      state.bidang = e.target.value;
+      syncFilterOptions();
+      refresh();
+    });
     document.getElementById('f-site').addEventListener('change', e=>{ state.site = e.target.value; refresh(); });
     document.getElementById('tk-groupby').addEventListener('change', refresh);
     document.getElementById('kd-groupby').addEventListener('change', refresh);
     document.getElementById('btn-reset').addEventListener('click', ()=>{
       state.bidang='ALL'; state.site='ALL';
-      document.getElementById('f-bidang').value='ALL';
-      document.getElementById('f-site').value='ALL';
+      syncFilterOptions();
       refresh();
     });
 
